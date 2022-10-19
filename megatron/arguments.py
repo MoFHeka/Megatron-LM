@@ -15,6 +15,9 @@ from tools.retro.utils import get_args_path as get_retro_args_path
 
 from megatron.core.transformer import TransformerConfig
 
+import megatron
+
+
 
 def parse_args(extra_args_provider=None, ignore_unknown_args=False):
     """Parse all arguments."""
@@ -262,7 +265,7 @@ def validate_args(args, defaults={}):
     if args.seq_length is not None:
         assert args.max_position_embeddings >= args.seq_length
     if args.decoder_seq_length is not None:
-        assert args.max_position_embeddings >= args.decoder_seq_length
+        assert args.max_position_embeddings >= args.decoder_seq_length    
     if args.lr is not None:
         assert args.min_lr <= args.lr
     if args.save is not None:
@@ -273,6 +276,10 @@ def validate_args(args, defaults={}):
     if args.fp32_residual_connection:
         assert args.fp16 or args.bf16, \
             'residual connection in fp32 only supported when using fp16 or bf16.'
+
+    # Activation function
+    if args.glu_activation is not None and args.bias_gelu_fusion:
+        raise ValueError("if glu-activation is used, please set --no-bias-gelu-fusion")
 
     if args.weight_decay_incr_style == 'constant':
         assert args.start_weight_decay is None
@@ -308,6 +315,18 @@ def validate_args(args, defaults={}):
             'distributed recompute activations are supported for pytorch ' \
             'v1.10 and above (Nvidia Pytorch container >= 21.07). Current ' \
             'pytorch version is v%s.%s.' % (TORCH_MAJOR, TORCH_MINOR)
+        
+    # Weights and Biases
+    if args.wandb_entity_name or args.wandb_project_name:
+        assert args.wandb_entity_name and args.wandb_project_name, \
+            "Both entity and project name must be set in order to report to wandb"
+    
+    # Local-rank from environment variable (if using torchrun)
+    if args.local_rank is None and "LOCAL_RANK" in os.environ:
+        args.local_rank = int(os.environ["LOCAL_RANK"])
+
+    assert not (args.fp8_e4m3 and args.fp8_hybrid), \
+        'cannot train with both fp8 e4m3 and hybrid formatting'
 
     if args.recompute_granularity == 'selective':
         assert args.recompute_method is None, \
@@ -551,8 +570,9 @@ def _add_network_size_args(parser):
                        help='Maximum number of position embeddings to use. '
                        'This is the size of position embedding.')
     group.add_argument('--position-embedding-type', type=str, default='learned_absolute',
-                       choices=['learned_absolute', 'rope'],
-                       help='Position embedding type.')
+                       choices=['learned_absolute', 'rope', 'alibi'],
+                       help='Position embedding type ("learned_absolute" | "rope" | "alibi"). "absolute" by default.'
+                       )
     group.add_argument('--use-rotary-position-embeddings', action='store_true',
                        help='Use rotary positional embeddings or not. '
                        'Deprecated: use --position-embedding-type')
@@ -593,6 +613,10 @@ def _add_network_size_args(parser):
     group.add_argument('--bert-no-binary-head', action='store_false',
                        help='Disable BERT binary head.',
                        dest='bert_binary_head')
+    group.add_argument('--glu-activation', type=str,
+                       choices=megatron.model.glu_activations.GLU_ACTIVATIONS.keys(),
+                       help='GLU activations to use.'
+                       )
     group.add_argument('--num-experts', type=int, default=None,
                        help='Number of Experts in Switch Transformer (None means no Switch)')
     group.add_argument('--untie-embeddings-and-output-weights', action='store_true',
@@ -663,6 +687,14 @@ def _add_logging_args(parser):
     group.add_argument('--log-world-size-to-tensorboard',
                        action='store_true',
                        help='Enable world size logging to tensorboard.')
+    
+    group.add_argument('--wandb-entity-name', type=str, default=None,
+                        help="Name of wandb entity for reporting")
+    group.add_argument('--wandb-project-name', type=str, default=None,
+                        help="Name of wandb project")
+    group.add_argument('--transformer-timers', action='store_true',
+                        help="If set, activate the timers within the transformer layers."
+                        "Only for debugging, as this slows down the model.")
 
     return parser
 
@@ -944,6 +976,9 @@ def _add_checkpointing_args(parser):
                        help="If '--load' is set, but checkpoint is not found "
                        "(e.g., path typo), then exit instead of random "
                        "initialization.")
+    group.add_argument('--finetune-from', type=str, default=None,
+                       help='Directory containing a model checkpoint for finetuning.'
+                       'Will be loaded if the `--load` directory contains no checkpoint')
 
     return parser
 

@@ -15,6 +15,10 @@ from .module import MegatronModule
 from .transformer import ParallelTransformer
 from .utils import get_linear_layer
 from .utils import init_method_normal, scaled_init_method_normal
+from megatron.model.enums import LayerType, AttnMaskType
+from megatron.model.transformer import ParallelTransformer
+from megatron.model.utils import get_linear_layer
+from megatron.model.utils import init_method_normal, scaled_init_method_normal
 
 
 def parallel_lm_logits(input_, word_embeddings_weight, parallel_output,

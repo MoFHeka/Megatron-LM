@@ -1496,6 +1496,7 @@ class ParallelTransformer(MegatronModule):
         # Transformer Engine Init.
         self.transformer_engine_v_0_10 = False
         self.transformer_engine_v_0_11 = False
+        self.transformer_engine_v_0_12 = False
         self.transformer_engine_v_0_8 = False
         if self.transformer_impl == 'transformer_engine':
             global transformer_engine
@@ -1510,6 +1511,8 @@ class ParallelTransformer(MegatronModule):
                 self.transformer_engine_v_0_10 = True
             if te_version >= packaging.version.Version("0.11.0"):
                 self.transformer_engine_v_0_11 = True
+            if te_version >= packaging.version.Version("0.12.0"):
+                self.transformer_engine_v_0_12 = True
 
             del version, packaging
 
@@ -1583,6 +1586,9 @@ class ParallelTransformer(MegatronModule):
                     extra_transformer_engine_kwargs["activation"] = "swiglu" if args.swiglu else "gelu"
                 if self.transformer_engine_v_0_11:
                     extra_transformer_engine_kwargs["normalization"] = args.normalization
+                if self.transformer_engine_v_0_12:
+                    if args.group_query_attention is True:
+                        extra_transformer_engine_kwargs["num_gqa_groups"] = args.num_query_groups
                 return transformer_engine.pytorch.TransformerLayer(
                     config.hidden_size,
                     config.ffn_hidden_size,

@@ -144,7 +144,8 @@ class DistributedOptimizer(MixedPrecisionOptimizer):
         bucket_buffer = bucket.data
         gbuf_size = bucket_buffer.numel()
         assert gbuf_size % data_parallel_world_size == 0, \
-            f"Each bucket's buffer size should be divisible by {data_parallel_world_size}"
+            f'''Each bucket's buffer size should be divisible by {data_parallel_world_size}. 
+                Now bucket_index is {bucket_index} with size {gbuf_size} and dtype {dtype}.'''
         max_gbuf_range_size = gbuf_size // data_parallel_world_size
 
         # All world ranges (i.e., across all data parallel ranks).

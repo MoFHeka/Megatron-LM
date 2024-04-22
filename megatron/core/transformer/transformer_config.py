@@ -251,12 +251,12 @@ class TransformerConfig(ModelParallelConfig):
     disable_parameter_transpose_cache: bool = False
     """When set to true, the parameter transposes are not cached for subsequent iterations."""
 
-    # These 2 attributes are WAR for TRTLLM export. DO NOT USE!! WILL BE DEPRECATED SOON!!
-    max_position_embeddings: int = 0
-    """Deprecated. Do not use."""
+    # # These 2 attributes are WAR for TRTLLM export. DO NOT USE!! WILL BE DEPRECATED SOON!!
+    # max_position_embeddings: int = 0
+    # """Deprecated. Do not use."""
 
-    rotary_percent: float = 0
-    """Deprecated. Do not use."""
+    # rotary_percent: float = 0
+    # """Deprecated. Do not use."""
 
     def __post_init__(self):
         """ Python dataclass method that is used to modify attributes after initialization.
